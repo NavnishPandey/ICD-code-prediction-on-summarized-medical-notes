@@ -1,5 +1,12 @@
 from pipeline.summarization_pipeline import MedicalNotePipeline
+import os
+from dotenv import load_dotenv
+from huggingface_hub import login
+import ray
+load_dotenv()
 
+token=os.getenv("HUGGINGFACEHUB_API_TOKEN")
+login(token)
 
 example_dialogue = """
     Doctor: Good morning, how are you feeling today?
@@ -15,6 +22,7 @@ def main():
     #dialogue = input("Paste medical dialogue:\n")
 
     pipeline = MedicalNotePipeline()
+    print(ray.available_resources())
     result = pipeline.process_dialogue(example_dialogue)
     
     print("\n--- Medical Note Summary ---\n")

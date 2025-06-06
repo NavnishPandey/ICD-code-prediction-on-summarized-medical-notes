@@ -3,7 +3,7 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import torch
 from langchain.prompts import PromptTemplate
 
-@ray.remote
+@ray.remote(num_gpus=1)
 class ICDPredictor:
     def __init__(self, model_name="microsoft/phi-2"):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
