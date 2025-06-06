@@ -1,8 +1,5 @@
 from pipeline.summarization_pipeline import MedicalNotePipeline
-from huggingface_hub import login
 
-token="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"
-login(token)
 
 example_dialogue = """
     Doctor: Good morning, how are you feeling today?
