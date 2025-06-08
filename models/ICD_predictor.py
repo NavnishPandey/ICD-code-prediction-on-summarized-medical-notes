@@ -1,51 +1,65 @@
-import ray
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
-from langchain.prompts import PromptTemplate
+import ray
 
-@ray.remote(num_gpus=1)
+@ray.remote
 class ICDPredictor:
     def __init__(self, model_name="microsoft/phi-2"):
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForSequenceClassification.from_pretrained(model_name)
+        self.model = AutoModelForCausalLM.from_pretrained(model_name)
+        self.model.eval()
 
-        self.prompt_template = PromptTemplate(
-            input_variables=["summary"],
-            template="""
-You are a clinical coding assistant.
+        self.prompt_template = """
+You are a clinical coding assistant. Based on the conversation summary below, return only the most relevant ICD-10 diagnosis code(s) from this list.
 
-Given the following medical summary, identify the most appropriate ICD-10 diagnosis code(s) from the list below. Respond only with the most relevant ICD-10 code(s).
-
-### ICD-10 Code List (Shortened):
+### ICD-10 Code List:
 - A00: Cholera  
+  > Symptoms: severe watery diarrhea, dehydration, vomiting  
 - B20: HIV disease  
+  > Symptoms: immunodeficiency, recurrent infections, weight loss  
 - C34: Malignant neoplasm of bronchus and lung  
+  > Symptoms: persistent cough, hemoptysis, chest pain, weight loss  
 - D50: Iron deficiency anemia  
+  > Symptoms: fatigue, pallor, weakness, shortness of breath  
 - E11: Type 2 diabetes mellitus  
+  > Symptoms: high blood sugar, frequent urination, increased thirst, blurred vision  
 - F32: Major depressive disorder  
+  > Symptoms: sadness, lack of interest, fatigue, sleep/appetite changes  
 - G40: Epilepsy  
+  > Symptoms: seizures, loss of consciousness, aura  
 - H52: Disorders of refraction and accommodation  
+  > Symptoms: blurred vision, myopia, hyperopia  
 - I10: Essential (primary) hypertension  
+  > Symptoms: high blood pressure, headaches, dizziness, often asymptomatic  
 - J45: Asthma  
+  > Symptoms: wheezing, shortness of breath, coughing, chest tightness  
 - K35: Acute appendicitis  
+  > Symptoms: abdominal pain (lower right), fever, nausea  
 - M54: Dorsalgia (Back Pain)  
+  > Symptoms: upper/lower back pain, stiffness, limited movement  
 - N39: Urinary tract infection  
+  > Symptoms: burning urination, frequent urination, lower abdominal pain  
 - R51: Headache  
-- Z00: General examination
+  > Symptoms: pain in head or neck region, tension or migraine-like  
+- Z00: General examination  
+  > Used when no complaint or diagnosis is present (routine checkup) 
 
 ### Medical Summary:
 {summary}
 
-Your Response (ICD-10 code only):
+### Your Response must be just ICD Codes Only:
 """
-        )
 
     def predict(self, summary: str) -> str:
-        # Simulate prompt (not used directly in classification, but could be for future generation)
         prompt = self.prompt_template.format(summary=summary)
-
-        inputs = self.tokenizer(summary, return_tensors="pt", truncation=True)
-        outputs = self.model(**inputs)
-        predicted_label = torch.argmax(outputs.logits, dim=1).item()
-
-        return f"ICD-Code-{predicted_label}"  # Optional: map label index to actual code if known
+        inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+        with torch.no_grad():
+            outputs = self.model.generate(
+                **inputs,
+                max_new_tokens=50,
+                do_sample=False,
+                pad_token_id=self.tokenizer.eos_token_id
+            )
+        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        icd_output = response.split("ICD Codes Only:")[-1].strip()
+        return icd_output

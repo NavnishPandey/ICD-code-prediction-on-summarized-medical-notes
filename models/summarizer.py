@@ -7,7 +7,7 @@ from langchain.llms import HuggingFacePipeline
 import logging
 logging.basicConfig(level=logging.INFO)
 
-@ray.remote(num_gpus=1)
+@ray.remote
 class Summarizer:
     def __init__(self, model_name="google/gemma-2b-it"):
         try:

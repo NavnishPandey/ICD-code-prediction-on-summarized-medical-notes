@@ -1,34 +1,23 @@
-from pipeline.summarization_pipeline import MedicalNotePipeline
-import os
-from dotenv import load_dotenv
-from huggingface_hub import login
 import ray
+from ray import serve
+import time, os
+from dotenv import load_dotenv
+from pipeline.pipeline import MedicalNotePipeline  
+from huggingface_hub import login
+
 load_dotenv()
 
 token=os.getenv("HUGGINGFACEHUB_API_TOKEN")
 login(token)
 
-example_dialogue = """
-    Doctor: Good morning, how are you feeling today?
-    Patient: I've been having chest pain for a few days, especially when I exert myself.
-    Doctor: Can you describe the pain? Is it sharp or dull?
-    Patient: It's a tight, squeezing feeling in my chest.
-    Doctor: Any other symptoms, like shortness of breath or cough?
-    Patient: No cough, but I do feel a bit short of breath sometimes.
-    Doctor: Alright, we'll run some tests to check your heart and lungs.
-    """
-def main():
-    print("==== Medical Dialogue Summarizer and ICD Predictor ====")
-    #dialogue = input("Paste medical dialogue:\n")
+ray.init(ignore_reinit_error=True)
+print(ray.available_resources())
 
-    pipeline = MedicalNotePipeline()
-    print(ray.available_resources())
-    result = pipeline.process_dialogue(example_dialogue)
-    
-    print("\n--- Medical Note Summary ---\n")
-    print(result["summary"])
-    print("\n--- Predicted ICD Code ---\n")
-    print(result["icd_code"])
+serve.run(MedicalNotePipeline.bind(), route_prefix="/MedicalNotePipeline")
 
-if __name__ == "__main__":
-    main()
+print("🚀 Service running at http://127.0.0.1:8000/MedicalNotePipeline")
+print("Press Ctrl+C to stop.")
+
+# Keep alive
+while True:
+    time.sleep(10)
